@@ -118,6 +118,15 @@ line-length = 88
 [tool.isort]
 profile = "black"
 
+[tool.pylint.main]
+enable = ["similarities"]
+
+[tool.pylint.similarities]
+min-similarity-lines = 8
+ignore-comments = true
+ignore-docstrings = true
+ignore-imports = true
+
 [tool.mypy]
 python_version = "3.13"
 strict = true
