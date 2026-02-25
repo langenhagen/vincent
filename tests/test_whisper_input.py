@@ -8,13 +8,13 @@ import contextlib
 from types import SimpleNamespace
 from typing import TYPE_CHECKING, Any, cast
 
+import pytest
+
 from vincent import whisper_input
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterator
     from pathlib import Path
-
-    import pytest
 
 EXPECTED_SAMPLE_RATE = 16_000
 
@@ -115,3 +115,58 @@ def test_capture_turn_reports_transcribe_and_saved_path(
     assert language == "en"
     assert any("Transcribing" in message for message in messages)
     assert any("Saved recording" in message for message in messages)
+
+
+def test_capture_turn_removes_kept_file_on_record_failure(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """Delete retained path when recording fails before transcription."""
+    wav_path = tmp_path / "turn.wav"
+    wav_path.write_text("placeholder", encoding="utf-8")
+
+    @contextlib.contextmanager
+    def fake_turn_wav_path(
+        *,
+        keep_input_audio: bool,
+        input_audio_session: str,
+    ) -> Iterator[Path]:
+        assert keep_input_audio
+        assert input_audio_session == "ses_123"
+        yield wav_path
+
+    def fake_record_wav_until_enter(
+        path: Path,
+        sample_rate: int,
+        channels: int,
+        status_writer: Callable[[str], None],
+    ) -> None:
+        assert path == wav_path
+        assert sample_rate == EXPECTED_SAMPLE_RATE
+        assert channels == 1
+        status_writer("Recording...\n")
+        msg = "No audio captured from microphone"
+        raise RuntimeError(msg)
+
+    args = argparse.Namespace(
+        keep_input_audio=True,
+        input_sample_rate=EXPECTED_SAMPLE_RATE,
+        input_channels=1,
+    )
+
+    monkeypatch.setattr(whisper_input, "turn_wav_path", fake_turn_wav_path)
+    monkeypatch.setattr(
+        whisper_input,
+        "record_wav_until_enter",
+        fake_record_wav_until_enter,
+    )
+
+    with pytest.raises(RuntimeError):
+        whisper_input.capture_turn(
+            args=args,
+            input_audio_session="ses_123",
+            whisper_model=cast("Any", object()),
+            status_writer=lambda _msg: None,
+        )
+
+    assert not wav_path.exists()

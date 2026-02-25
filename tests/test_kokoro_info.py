@@ -26,8 +26,8 @@ def test_list_voices_filters_and_sorts(monkeypatch: pytest.MonkeyPatch) -> None:
 
     monkeypatch.setattr(
         kokoro_info,
-        "load_module_attr",
-        lambda _module_name, _attr_name: fake_list_repo_files,
+        "list_repo_files",
+        fake_list_repo_files,
     )
 
     voices = kokoro_info.list_voices("hexgrad/Kokoro-82M")
@@ -74,23 +74,21 @@ def test_main_without_flags_prints_all_sections(
 ) -> None:
     """Show every section when no explicit output flags are provided."""
 
-    def fake_module_attr(module_name: str, attr_name: str) -> object:
-        if (module_name, attr_name) == ("kokoro.pipeline", "LANG_CODES"):
-            return {"a": "American English"}
-        if (module_name, attr_name) == ("kokoro.pipeline", "ALIASES"):
-            return {"en-us": "a"}
-        if (module_name, attr_name) == ("huggingface_hub", "list_repo_files"):
-
-            def fake_list_repo_files(*, repo_id: str, repo_type: str) -> list[str]:
-                assert repo_id == "hexgrad/Kokoro-82M"
-                assert repo_type == "model"
-                return ["voices/af_heart.pt"]
-
-            return fake_list_repo_files
-        msg = f"Unexpected module attribute request: {module_name}.{attr_name}"
-        raise AssertionError(msg)
-
-    monkeypatch.setattr(kokoro_info, "load_module_attr", fake_module_attr)
+    monkeypatch.setattr(
+        kokoro_info,
+        "list_lang_codes",
+        lambda: {"a": "American English"},
+    )
+    monkeypatch.setattr(
+        kokoro_info,
+        "list_aliases",
+        lambda: {"en-us": "a"},
+    )
+    monkeypatch.setattr(
+        kokoro_info,
+        "list_voices",
+        lambda _repo_id: ["af_heart"],
+    )
 
     exit_code = kokoro_info.main([])
     output = capsys.readouterr().out

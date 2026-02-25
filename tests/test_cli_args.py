@@ -4,12 +4,10 @@ from __future__ import annotations
 
 # pylint: disable=import-error  # E0401: some lint envs miss editable imports.
 import sys
-from typing import TYPE_CHECKING
+
+import pytest
 
 from vincent import cli
-
-if TYPE_CHECKING:
-    import pytest
 
 EXPECTED_SAMPLE_RATE = 16_000
 
@@ -78,3 +76,16 @@ def test_parse_args_voice_defaults_on_and_can_disable(
 
     assert default_args.voice
     assert not disabled_args.voice
+
+
+def test_parse_args_rejects_non_positive_input_values(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Reject zero/negative values for audio input numeric options."""
+    monkeypatch.setattr(sys, "argv", ["vincent", "--input-sample-rate", "0"])
+    with pytest.raises(SystemExit):
+        cli.parse_args()
+
+    monkeypatch.setattr(sys, "argv", ["vincent", "--input-channels", "-1"])
+    with pytest.raises(SystemExit):
+        cli.parse_args()
