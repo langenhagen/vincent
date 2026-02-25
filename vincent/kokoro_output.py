@@ -80,5 +80,9 @@ class KokoroSpeaker:  # pylint: disable=too-few-public-methods
             return
 
         output_audio = np.concatenate(chunks)
-        sd.play(output_audio, samplerate=self._sample_rate)
-        sd.wait()
+        try:
+            sd.play(output_audio, samplerate=self._sample_rate)
+            sd.wait()
+        except KeyboardInterrupt:
+            sd.stop()
+            raise

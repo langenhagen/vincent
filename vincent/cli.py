@@ -410,6 +410,9 @@ def run_voice_chat(args: argparse.Namespace) -> None:  # noqa: C901, PLR0912, PL
         if speaker:
             try:
                 speaker.speak(assistant_text)
+            except KeyboardInterrupt:
+                stderr("Stopped.\n")
+                return
             except (RuntimeError, ValueError, OSError, sd.PortAudioError) as exc:
                 stderr(f"Kokoro playback failed: {exc}\n")
 
