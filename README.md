@@ -1,11 +1,13 @@
 # Vincent Voice Chat
 A Whisper-, Kokoro- and Opencode-powered voice chat Agent CLI.
 
-Single-purpose voice chat CLI:
+![](res/vincent.webp)
+
+Voice chat with your AI agent:
 - records microphone audio until you press Enter,
 - transcribes with local Whisper,
 - sends each turn to `opencode run`,
-- optionally speaks assistant replies with Kokoro (`--voice`).
+- speaks assistant replies with Kokoro.
 
 ## Setup
 
