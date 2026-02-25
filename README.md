@@ -29,9 +29,14 @@ uv run vincent --voice  # Enable assistant speech output
 uv run vincent --help
 uv run vincent --new-session
 uv run vincent --session-id ses_abc123
-uv run vincent --task translate
-uv run vincent --model small
+uv run vincent --whisper-task translate
+uv run vincent --whisper-model small
 uv run vincent --voice --tts-voice af_heart --tts-lang-code a --tts-speed 1.0
+
+# Look up Kokoro Language Codes, Voices and Whatnot
+uv run vincent-kokoro-info --lang-codes
+uv run vincent-kokoro-info --aliases
+uv run vincent-kokoro-info --voices
 ```
 
 Say `exit` or `quit` to stop.

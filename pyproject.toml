@@ -13,6 +13,7 @@ dependencies = [
 
 [project.scripts]
 vincent = "voice_chat:main"
+vincent-kokoro-info = "kokoro_info:main"
 voice-chat = "voice_chat:main"
 
 [dependency-groups]
@@ -33,7 +34,7 @@ requires = ["hatchling>=1.27.0"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
-only-include = ["voice_chat.py"]
+only-include = ["voice_chat.py", "kokoro_info.py"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
