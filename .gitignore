@@ -10,4 +10,5 @@ __pycache__/
 .coverage
 htmlcov/
 
+.voice_inputs/
 .voice_chat_state.json
