@@ -13,7 +13,7 @@ import sys
 import tempfile
 import threading
 import warnings
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 
 import numpy as np
@@ -336,6 +336,12 @@ def format_assistant_label(text: str) -> str:
     return f"\033[1m{ASSISTANT_LABEL_COLOR}{text}{ANSI_RESET}"
 
 
+def safe_session_dir_name(raw_name: str) -> str:
+    """Convert a session id/name to a filesystem-safe directory name."""
+    cleaned = re.sub(r"[^A-Za-z0-9_.-]", "_", raw_name)
+    return cleaned or "unknown-session"
+
+
 def record_wav_until_enter(path: Path, sample_rate: int, channels: int) -> None:
     """Record microphone audio until Enter is pressed, then save a WAV file."""
     chunks: list[np.ndarray] = []
@@ -490,19 +496,15 @@ def ask_opencode(
     return response_text, discovered_session or session_id
 
 
-def capture_turn(args: argparse.Namespace) -> tuple[str, str | None]:
+def capture_turn(
+    args: argparse.Namespace,
+    input_audio_session: str,
+) -> tuple[str, str | None]:
     """Record one microphone turn and transcribe it with Whisper."""
-
-    def safe_session_dir_name(raw_name: str) -> str:
-        """Convert session name to a filesystem-safe directory name."""
-        cleaned = re.sub(r"[^A-Za-z0-9_.-]", "_", raw_name)
-        return cleaned or "unknown-session"
-
     if args.keep_input_audio:
-        session_name = getattr(args, "_input_audio_session", "new-session")
-        session_dir = KEPT_INPUT_AUDIO_DIR / safe_session_dir_name(session_name)
+        session_dir = KEPT_INPUT_AUDIO_DIR / safe_session_dir_name(input_audio_session)
         session_dir.mkdir(parents=True, exist_ok=True)
-        timestamp = datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
+        timestamp = datetime.now(tz=UTC).strftime("%Y-%m-%d-%H-%M-%S")
         fd, temp_name = tempfile.mkstemp(
             prefix=f"{timestamp}-",
             suffix=".wav",
@@ -571,8 +573,8 @@ def run_voice_chat(args: argparse.Namespace) -> None:  # noqa: C901, PLR0912, PL
 
     while True:
         try:
-            args._input_audio_session = session_id or "new-session"
-            user_text, detected_language = capture_turn(args)
+            current_session = session_id or "new-session"
+            user_text, detected_language = capture_turn(args, current_session)
         except RuntimeError as exc:
             stderr(f"{exc}\n")
             stderr("Please try again.\n")

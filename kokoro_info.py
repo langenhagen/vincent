@@ -7,6 +7,9 @@ import sys
 from collections.abc import Callable
 from typing import Literal, overload
 
+from huggingface_hub import list_repo_files
+from kokoro.pipeline import ALIASES, LANG_CODES
+
 
 def stdout(message: str) -> None:
     """Write text to stdout without adding extra formatting."""
@@ -37,18 +40,12 @@ def load_module_attr(
 def load_module_attr(module_name: str, attr_name: str) -> object:
     """Load a whitelisted attribute from known modules."""
     if module_name == "huggingface_hub" and attr_name == "list_repo_files":
-        from huggingface_hub import list_repo_files
-
         return list_repo_files
 
     if module_name == "kokoro.pipeline" and attr_name == "LANG_CODES":
-        from kokoro.pipeline import LANG_CODES
-
         return LANG_CODES
 
     if module_name == "kokoro.pipeline" and attr_name == "ALIASES":
-        from kokoro.pipeline import ALIASES
-
         return ALIASES
 
     msg = f"Unsupported module attribute: {module_name}.{attr_name}"
@@ -85,8 +82,8 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 
 def list_voices(repo_id: str) -> list[str]:
     """Return available voice ids from a Kokoro Hugging Face repository."""
-    list_repo_files = load_module_attr("huggingface_hub", "list_repo_files")
-    files = list_repo_files(repo_id=repo_id, repo_type="model")
+    list_repo_files_fn = load_module_attr("huggingface_hub", "list_repo_files")
+    files = list_repo_files_fn(repo_id=repo_id, repo_type="model")
     voices = [
         path.removeprefix("voices/").removesuffix(".pt")
         for path in files
