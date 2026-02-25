@@ -5,9 +5,11 @@ description = "Microphone voice chat bridge with Whisper, opencode, and optional
 readme = "README.md"
 requires-python = ">=3.13,<3.14"
 dependencies = [
+  # Kokoro English G2P uses this spaCy model at runtime; pin it so uv keeps it installed.
+  "en-core-web-sm @ https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.8.0/en_core_web_sm-3.8.0-py3-none-any.whl",
   "faster-whisper>=1.2.1",
   "kokoro>=0.9.4",
-  "scipy>=1.17.0",
+  "scipy>=1.17.1",
   "sounddevice>=0.5.5",
 ]
 
@@ -19,26 +21,29 @@ voice-chat = "voice_chat:main"
 [dependency-groups]
 dev = [
   "mypy>=1.15.0",
-  "pre-commit>=4.2.0",
-  "pytest>=8.3.5",
-  "pytest-cov>=6.0.0",
-  "pytest-randomly>=3.15.0",
-  "ruff>=0.11.10",
+  "pre-commit>=4.5.1",
+  "pytest>=9.0.2",
+  "pytest-cov>=6.3.0",
+  "pytest-randomly>=3.16.0",
+  "ruff>=0.15.2",
 ]
 lint = [
-  "bandit>=1.7.9",
-  "black>=24.10.0",
-  "flake8>=7.1.1",
-  "isort>=5.13.2",
-  "pylint>=3.3.1",
+  "bandit>=1.9.4",
+  "black>=26.1.0",
+  "flake8>=7.3.0",
+  "isort>=8.0.0",
+  "pylint>=4.0.5",
   "refurb>=2.0.0",
-  "ty>=0.0.1a4",
-  "vulture>=2.11",
+  "ty>=0.0.18",
+  "vulture>=2.14",
 ]
 
 [build-system]
 requires = ["hatchling>=1.27.0"]
 build-backend = "hatchling.build"
+
+[tool.hatch.metadata]
+allow-direct-references = true
 
 [tool.hatch.build.targets.wheel]
 only-include = ["voice_chat.py", "kokoro_info.py"]
