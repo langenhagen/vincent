@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import argparse
-import importlib
 import sys
 from collections.abc import Callable
 from typing import Literal, overload
@@ -36,9 +35,24 @@ def load_module_attr(
 
 
 def load_module_attr(module_name: str, attr_name: str) -> object:
-    """Load an attribute from a module by name at runtime."""
-    module = importlib.import_module(module_name)
-    return getattr(module, attr_name)
+    """Load a whitelisted attribute from known modules."""
+    if module_name == "huggingface_hub" and attr_name == "list_repo_files":
+        from huggingface_hub import list_repo_files
+
+        return list_repo_files
+
+    if module_name == "kokoro.pipeline" and attr_name == "LANG_CODES":
+        from kokoro.pipeline import LANG_CODES
+
+        return LANG_CODES
+
+    if module_name == "kokoro.pipeline" and attr_name == "ALIASES":
+        from kokoro.pipeline import ALIASES
+
+        return ALIASES
+
+    msg = f"Unsupported module attribute: {module_name}.{attr_name}"
+    raise ValueError(msg)
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:

@@ -38,6 +38,7 @@ Prefer repo-local, reproducible commands:
 - Run app with assistant speech output: `uv run voice-chat --voice`.
 - Run tests: `uv run pytest`.
 - Run linter: `uv run ruff check .`.
+- Run Semgrep scan: `uv run --group lint semgrep --config=auto --error .`.
 - Format code: `uv run ruff format .`.
 - Run type checks: `uv run mypy`.
 - Install hooks: `uv run pre-commit install`.
