@@ -72,7 +72,7 @@ Interpret these tokens as explicit workflow commands:
   - Use web results as supporting context.
 
 - `mc`, `cm`, or `commit`
-  - Create a git commit.
+  - Create at least one git commit.
   - Follow commit message rules below.
   - Include both the commit message and a short prose walkthrough.
 
