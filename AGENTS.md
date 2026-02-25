@@ -48,6 +48,14 @@ Prefer repo-local, reproducible commands:
 
 Do not run full test suites automatically unless requested; use focused checks for touched files first when possible.
 
+## Testing Boundaries
+
+- Prefer unit tests for parsing, command building, and pure logic.
+- Do not write tests that require a live microphone, speaker, or audio device by default.
+- Do not write tests that call `opencode` or external APIs/networks by default.
+- Mock external process, network, and device dependencies in tests.
+- If an integration test against `opencode` is truly needed, document cost/latency tradeoffs and run it sparingly.
+
 ## User Shorthand Conventions
 
 Interpret these tokens as explicit workflow commands:

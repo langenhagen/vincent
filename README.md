@@ -31,6 +31,9 @@ uv run vincent --new-session
 uv run vincent --session-id ses_abc123
 uv run vincent --whisper-task translate
 uv run vincent --whisper-model small
+uv run vincent --input-language en
+uv run vincent --input-sample-rate 16000 --input-channels 1
+uv run vincent --keep-input-audio
 uv run vincent --voice --tts-voice af_heart --tts-lang-code a --tts-speed 1.0
 
 # Look up Kokoro Language Codes, Voices and Whatnot
@@ -40,3 +43,10 @@ uv run vincent-kokoro-info --voices
 ```
 
 Say `exit` or `quit` to stop.
+
+## Input Flags
+
+- `--input-language`: hint the spoken language for Whisper (faster and often more accurate); omit to auto-detect.
+- `--input-sample-rate`: microphone capture rate in Hz (default `16000`, good for speech).
+- `--input-channels`: microphone channel count (`1` mono is typical; `2` stereo if needed).
+- `--keep-input-audio`: keep each turn's temporary WAV on disk for debugging.

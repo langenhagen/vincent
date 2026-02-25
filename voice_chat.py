@@ -7,7 +7,7 @@ import contextlib
 import importlib
 import json
 import os
-import subprocess
+import subprocess  # nosec B404  # B404: required for opencode CLI subprocess call.
 import sys
 import tempfile
 import threading
@@ -67,7 +67,7 @@ def whisper_to_text(
     segments, info = model.transcribe(
         str(wav_path),
         task=args.whisper_task,
-        language=args.language,
+        language=args.input_language,
         vad_filter=True,
     )
     text = " ".join(
@@ -76,7 +76,7 @@ def whisper_to_text(
     return text.strip(), getattr(info, "language", None)
 
 
-class KokoroSpeaker:
+class KokoroSpeaker:  # pylint: disable=too-few-public-methods
     """Generate and play speech audio from assistant text with Kokoro."""
 
     def __init__(
@@ -139,10 +139,7 @@ class KokoroSpeaker:
             split_pattern=r"\n+",
         )
 
-        chunks: list[np.ndarray] = []
-        for _, _, audio in generator:
-            if len(audio):
-                chunks.append(audio)
+        chunks = [audio for _, _, audio in generator if len(audio)]
 
         if not chunks:
             return
@@ -183,16 +180,26 @@ def parse_args() -> argparse.Namespace:
         help="Whisper task: transcribe original language or translate to English",
     )
     parser.add_argument(
-        "--language",
+        "--input-language",
         default=None,
-        help="Language code, e.g. en, de, fr",
+        help="Expected spoken language code, e.g. en, de, fr (omit for auto)",
     )
-    parser.add_argument("--sample-rate", type=int, default=16000)
-    parser.add_argument("--channels", type=int, default=1)
     parser.add_argument(
-        "--keep-audio",
+        "--input-sample-rate",
+        type=int,
+        default=16000,
+        help="Microphone input sample rate in Hz",
+    )
+    parser.add_argument(
+        "--input-channels",
+        type=int,
+        default=1,
+        help="Microphone input channel count (1=mono, 2=stereo)",
+    )
+    parser.add_argument(
+        "--keep-input-audio",
         action="store_true",
-        help="Keep each temporary wav file and print its path",
+        help="Keep each recorded input WAV file and print its path",
     )
 
     session_group = parser.add_mutually_exclusive_group()
@@ -342,7 +349,7 @@ def record_wav_until_enter(path: Path, sample_rate: int, channels: int) -> None:
             input()
         stop_event.set()
 
-    stderr("Recording... press Enter to stop this turn.")
+    stderr("Recording... press Enter to stop this turn.\n")
     input_thread = threading.Thread(target=wait_for_enter, daemon=True)
     input_thread.start()
 
@@ -460,7 +467,8 @@ def ask_opencode(
 ) -> tuple[str, str | None]:
     """Send one prompt to opencode and return the response and session id."""
     command = build_opencode_command(prompt, args, session_id)
-    result = subprocess.run(
+    # Fixed argv list; shell execution is explicitly disabled.
+    result = subprocess.run(  # noqa: S603  # nosec B603
         command,
         check=False,
         capture_output=True,
@@ -468,7 +476,8 @@ def ask_opencode(
     )
     if result.returncode != 0:
         details = result.stderr.strip() or result.stdout.strip()
-        raise RuntimeError(f"opencode run failed ({result.returncode}): {details}")
+        msg = f"opencode run failed ({result.returncode}): {details}"
+        raise RuntimeError(msg)
 
     response_text, discovered_session = parse_opencode_events(result.stdout)
     return response_text, discovered_session or session_id
@@ -476,21 +485,25 @@ def ask_opencode(
 
 def capture_turn(args: argparse.Namespace) -> tuple[str, str | None]:
     """Record one microphone turn and transcribe it with Whisper."""
-    with tempfile.NamedTemporaryFile(suffix=".wav", delete=not args.keep_audio) as tmp:
+    with tempfile.NamedTemporaryFile(
+        suffix=".wav",
+        delete=not args.keep_input_audio,
+    ) as tmp:
         wav_path = Path(tmp.name)
         record_wav_until_enter(
             wav_path,
-            sample_rate=args.sample_rate,
-            channels=args.channels,
+            sample_rate=args.input_sample_rate,
+            channels=args.input_channels,
         )
         stderr("Transcribing...\n")
         text, detected_language = whisper_to_text(wav_path=wav_path, args=args)
-        if args.keep_audio:
+        if args.keep_input_audio:
             stderr(f"Saved recording: {wav_path}\n")
     return text.strip(), detected_language
 
 
-def run_voice_chat(args: argparse.Namespace) -> None:
+# pylint: disable=too-many-branches,too-many-statements
+def run_voice_chat(args: argparse.Namespace) -> None:  # noqa: C901, PLR0912, PLR0915
     """Run the continuous record/transcribe/ask/reply loop."""
     state_path = args.session_file.expanduser().resolve()
     session_id = resolve_session_id(args, state_path)
@@ -506,7 +519,9 @@ def run_voice_chat(args: argparse.Namespace) -> None:
             )
             stderr(
                 "Kokoro TTS enabled "
-                f"(voice={args.tts_voice}, lang={args.tts_lang_code}, speed={args.tts_speed}).\n"
+                f"(voice={args.tts_voice}, "
+                f"lang={args.tts_lang_code}, "
+                f"speed={args.tts_speed}).\n",
             )
         except RuntimeError as exc:
             stderr(f"Voice requested but unavailable: {exc}\n")
@@ -518,7 +533,7 @@ def run_voice_chat(args: argparse.Namespace) -> None:
     else:
         stderr(
             "No saved opencode session found. A new session will be created on "
-            "the first prompt.\n"
+            "the first prompt.\n",
         )
 
     stderr("Speak, then press Enter to finish each turn.\n")
@@ -578,7 +593,7 @@ def run_voice_chat(args: argparse.Namespace) -> None:
         if speaker:
             try:
                 speaker.speak(assistant_text)
-            except Exception as exc:  # pylint: disable=broad-exception-caught
+            except (RuntimeError, ValueError, OSError, sd.PortAudioError) as exc:
                 stderr(f"Kokoro playback failed: {exc}\n")
 
 
