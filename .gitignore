@@ -2,4 +2,7 @@
 __pycache__/
 .mypy_cache/
 .ruff_cache/
+.pytest_cache/
+.coverage
+htmlcov/
 .voice_chat_state.json
