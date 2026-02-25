@@ -1,4 +1,5 @@
 # Vincent Voice Chat
+A Whisper-, Kokoro- and Opencode-powered voice chat Agent CLI.
 
 Single-purpose voice chat CLI:
 - records microphone audio until you press Enter,
