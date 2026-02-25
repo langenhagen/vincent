@@ -5,7 +5,6 @@ from __future__ import annotations
 # pylint: disable=import-error  # E0401: some lint envs miss editable imports.
 import argparse
 import contextlib
-from pathlib import Path
 from types import SimpleNamespace
 from typing import TYPE_CHECKING, Any, cast
 
@@ -13,17 +12,25 @@ from vincent import whisper_input
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterator
+    from pathlib import Path
 
     import pytest
 
+EXPECTED_SAMPLE_RATE = 16_000
 
-def test_whisper_to_text_joins_nonempty_segments() -> None:
+
+def test_whisper_to_text_joins_nonempty_segments(tmp_path: Path) -> None:
     """Join non-empty segment text values and return detected language."""
 
-    class FakeWhisperModel:
+    class FakeWhisperModel:  # pylint: disable=too-few-public-methods
+        """Simple stand-in that exposes the Whisper transcribe interface."""
+
         def transcribe(
-            self, _wav_path: str, **_kwargs: object
+            self,
+            _wav_path: str,
+            **_kwargs: object,
         ) -> tuple[object, object]:
+            """Return fixed segment and language values for testing."""
             segments = [
                 SimpleNamespace(text=" hello "),
                 SimpleNamespace(text=""),
@@ -34,7 +41,7 @@ def test_whisper_to_text_joins_nonempty_segments() -> None:
 
     args = argparse.Namespace(whisper_task="transcribe", input_language=None)
     text, language = whisper_input.whisper_to_text(
-        wav_path=Path("/tmp/fake.wav"),
+        wav_path=tmp_path / "fake.wav",
         args=args,
         whisper_model=cast("Any", FakeWhisperModel()),
     )
@@ -51,7 +58,13 @@ def test_capture_turn_reports_transcribe_and_saved_path(
     fake_path = tmp_path / "turn.wav"
 
     @contextlib.contextmanager
-    def fake_turn_wav_path(_keep: bool, _session: str) -> Iterator[Path]:
+    def fake_turn_wav_path(
+        *,
+        keep_input_audio: bool,
+        input_audio_session: str,
+    ) -> Iterator[Path]:
+        assert keep_input_audio
+        assert input_audio_session == "ses_123"
         yield fake_path
 
     def fake_record_wav_until_enter(
@@ -61,7 +74,7 @@ def test_capture_turn_reports_transcribe_and_saved_path(
         status_writer: Callable[[str], None],
     ) -> None:
         assert path == fake_path
-        assert sample_rate == 16000
+        assert sample_rate == EXPECTED_SAMPLE_RATE
         assert channels == 1
         status_writer("Recording...\n")
 
@@ -94,7 +107,7 @@ def test_capture_turn_reports_transcribe_and_saved_path(
     text, language = whisper_input.capture_turn(
         args=args,
         input_audio_session="ses_123",
-        whisper_model=fake_model,
+        whisper_model=cast("Any", fake_model),
         status_writer=messages.append,
     )
 

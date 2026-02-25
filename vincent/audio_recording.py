@@ -46,6 +46,7 @@ def create_kept_input_path(input_audio_session: str) -> Path:
 
 @contextlib.contextmanager
 def turn_wav_path(
+    *,
     keep_input_audio: bool,
     input_audio_session: str,
 ) -> Iterator[Path]:

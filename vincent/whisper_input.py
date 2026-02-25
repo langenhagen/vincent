@@ -52,7 +52,10 @@ def capture_turn(
     status_writer: Callable[[str], None],
 ) -> tuple[str, str | None]:
     """Record one turn from the mic and transcribe it with Whisper."""
-    with turn_wav_path(args.keep_input_audio, input_audio_session) as wav_path:
+    with turn_wav_path(
+        keep_input_audio=args.keep_input_audio,
+        input_audio_session=input_audio_session,
+    ) as wav_path:
         record_wav_until_enter(
             wav_path,
             sample_rate=args.input_sample_rate,

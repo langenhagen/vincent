@@ -16,7 +16,10 @@ def test_safe_session_dir_name_sanitizes_special_chars() -> None:
 
 def test_turn_wav_path_uses_temp_file_when_not_kept() -> None:
     """Yield a temporary .wav path for one non-persisted turn."""
-    with audio_recording.turn_wav_path(False, "ses_123") as wav_path:
+    with audio_recording.turn_wav_path(
+        keep_input_audio=False,
+        input_audio_session="ses_123",
+    ) as wav_path:
         assert isinstance(wav_path, Path)
         assert wav_path.suffix == ".wav"
 
@@ -26,7 +29,10 @@ def test_turn_wav_path_persists_under_session_folder(tmp_path: Path) -> None:
     original_dir = audio_recording.KEPT_INPUT_AUDIO_DIR
     audio_recording.KEPT_INPUT_AUDIO_DIR = tmp_path
     try:
-        with audio_recording.turn_wav_path(True, "ses_abc") as wav_path:
+        with audio_recording.turn_wav_path(
+            keep_input_audio=True,
+            input_audio_session="ses_abc",
+        ) as wav_path:
             assert wav_path.parent == tmp_path / "ses_abc"
             assert wav_path.name.endswith(".wav")
     finally:
