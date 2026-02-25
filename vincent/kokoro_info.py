@@ -1,4 +1,9 @@
-"""Small CLI helpers for inspecting Kokoro voices and language codes."""
+"""Kokoro metadata command-line tool.
+
+This module backs the executable `kokoro-info` script. It prints Kokoro
+language codes, aliases, and available voice IDs so users can quickly pick
+valid values for TTS configuration.
+"""
 
 from __future__ import annotations
 

@@ -1,0 +1,1 @@
+"""Vincent voice chat package."""

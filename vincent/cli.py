@@ -1,155 +1,33 @@
-"""Voice chat bridge: microphone Whisper transcription + opencode session."""
+"""Main Vincent CLI orchestration.
+
+This module wires the full chat loop together: parse command-line options,
+capture and transcribe microphone turns, send prompts to opencode, render
+terminal output, and optionally speak assistant replies with Kokoro.
+"""
 
 # pylint: disable=import-error
 
+from __future__ import annotations
+
 import argparse
-import contextlib
-import importlib
 import json
 import os
-import re
 import subprocess  # nosec B404  # B404: required for opencode CLI subprocess call.
 import sys
-import tempfile
-import threading
-import warnings
-from datetime import UTC, datetime
 from pathlib import Path
 
-import numpy as np
 import sounddevice as sd
-from faster_whisper import WhisperModel
-from scipy.io.wavfile import write as wav_write
+
+from .kokoro_output import KokoroSpeaker
+from .whisper_input import build_whisper_model, capture_turn
 
 EXIT_PHRASES = {"exit", "quit", "goodbye"}
-KEPT_INPUT_AUDIO_DIR = Path(".voice_inputs")
 ANSI_RESET = "\033[0m"
-ASSISTANT_COLOR_CODES = {
-    "none": "",
-    "cyan": "\033[36m",
-    "green": "\033[32m",
-    "yellow": "\033[33m",
-    "magenta": "\033[35m",
-}
-USER_COLOR_CODES = {
-    "none": "",
-    "blue": "\033[34m",
-    "white": "\033[37m",
-    "bright-black": "\033[90m",
-    "green": "\033[32m",
-    "yellow": "\033[33m",
-}
-SYSTEM_COLOR_CODES = {
-    "none": "",
-    "blue": "\033[34m",
-    "white": "\033[37m",
-    "bright-black": "\033[90m",
-    "green": "\033[32m",
-    "yellow": "\033[33m",
-}
-SYSTEM_COLOR_NAME = "bright-black"
-SYSTEM_BOLD_ENABLED = False
+ANSI_BOLD = "\033[1m"
+SYSTEM_TEXT_COLOR = "\033[90m"
 USER_LABEL_COLOR = "\033[34m"
 ASSISTANT_LABEL_COLOR = "\033[32m"
-USER_TEXT_COLOR_NAME = "none"
-USER_TEXT_BOLD_ENABLED = False
-ASSISTANT_TEXT_COLOR_NAME = "cyan"
-ASSISTANT_TEXT_BOLD_ENABLED = False
-
-
-def whisper_to_text(
-    wav_path: Path,
-    args: argparse.Namespace,
-) -> tuple[str, str | None]:
-    """Run Whisper on a WAV file and return text plus detected language."""
-    model = WhisperModel(
-        args.whisper_model,
-        device=args.whisper_device,
-        compute_type=args.whisper_compute_type,
-    )
-    segments, info = model.transcribe(
-        str(wav_path),
-        task=args.whisper_task,
-        language=args.input_language,
-        vad_filter=True,
-    )
-    text = " ".join(
-        segment.text.strip() for segment in segments if segment.text.strip()
-    )
-    return text.strip(), getattr(info, "language", None)
-
-
-class KokoroSpeaker:  # pylint: disable=too-few-public-methods
-    """Generate and play speech audio from assistant text with Kokoro."""
-
-    def __init__(
-        self,
-        lang_code: str,
-        voice: str,
-        speed: float,
-    ) -> None:
-        """Initialize Kokoro pipeline and playback parameters."""
-        warnings.filterwarnings(
-            "ignore",
-            message=("dropout option adds dropout after all but last recurrent layer"),
-            category=UserWarning,
-        )
-        warnings.filterwarnings(
-            "ignore",
-            message=(
-                "`torch.nn.utils.weight_norm` is deprecated in favor of "
-                "`torch.nn.utils.parametrizations.weight_norm`"
-            ),
-            category=FutureWarning,
-        )
-
-        try:
-            kokoro_module = importlib.import_module("kokoro")
-        except Exception as exc:  # pylint: disable=broad-exception-caught
-            msg = (
-                "Kokoro could not be imported. Install with `uv add kokoro` and "
-                "use Python 3.10-3.13 for voice mode."
-            )
-            raise RuntimeError(msg) from exc
-
-        kpipeline = getattr(kokoro_module, "KPipeline", None)
-        if kpipeline is None:
-            msg = "Installed kokoro package does not expose KPipeline"
-            raise RuntimeError(msg)
-
-        try:
-            self._pipeline = kpipeline(
-                lang_code=lang_code,
-                repo_id="hexgrad/Kokoro-82M",
-            )
-        except Exception as exc:  # pylint: disable=broad-exception-caught
-            msg = (
-                "Kokoro failed to initialize. This is often a Python-version "
-                "compatibility problem (Kokoro stack currently targets Python "
-                "3.10-3.13, while this project uses 3.14)."
-            )
-            raise RuntimeError(msg) from exc
-        self._voice = voice
-        self._speed = speed
-        self._sample_rate = 24000
-
-    def speak(self, text: str) -> None:
-        """Convert text to speech and play it through the default audio output."""
-        generator = self._pipeline(
-            text,
-            voice=self._voice,
-            speed=self._speed,
-            split_pattern=r"\n+",
-        )
-
-        chunks = [audio for _, _, audio in generator if len(audio)]
-
-        if not chunks:
-            return
-
-        output_audio = np.concatenate(chunks)
-        sd.play(output_audio, samplerate=self._sample_rate)
-        sd.wait()
+ASSISTANT_TEXT_COLOR = "\033[36m"
 
 
 def parse_args() -> argparse.Namespace:
@@ -202,10 +80,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--keep-input-audio",
         action="store_true",
-        help=(
-            "Keep each recorded input WAV in .voice_inputs/<session>/ with a "
-            "YYYY-MM-DD-HH-MM-SS filename prefix"
-        ),
+        help="Keep each recorded input WAV in .voice_inputs/<session>/",
     )
 
     session_group = parser.add_mutually_exclusive_group()
@@ -280,11 +155,7 @@ def stdout(message: str) -> None:
 def stderr(message: str) -> None:
     """Write a message to standard error and flush immediately."""
     if supports_ansi():
-        color = SYSTEM_COLOR_CODES.get(SYSTEM_COLOR_NAME, "")
-        if SYSTEM_BOLD_ENABLED:
-            color = f"\033[1m{color}"
-        if color:
-            message = f"{color}{message}{ANSI_RESET}"
+        message = f"{SYSTEM_TEXT_COLOR}{message}{ANSI_RESET}"
     sys.stderr.write(message)
     sys.stderr.flush()
 
@@ -296,93 +167,35 @@ def supports_ansi() -> bool:
     return sys.stdout.isatty()
 
 
-def format_assistant_text(text: str) -> str:
-    """Apply optional ANSI style to assistant output text."""
+def apply_ansi(text: str, *styles: str) -> str:
+    """Wrap text in ANSI styles when terminal output supports it."""
     if not supports_ansi():
         return text
 
-    color = ASSISTANT_COLOR_CODES.get(ASSISTANT_TEXT_COLOR_NAME, "")
-    if ASSISTANT_TEXT_BOLD_ENABLED:
-        color = f"\033[1m{color}"
-    if not color:
+    prefix = "".join(styles)
+    if not prefix:
         return text
-    return f"{color}{text}{ANSI_RESET}"
+    return f"{prefix}{text}{ANSI_RESET}"
+
+
+def format_assistant_text(text: str) -> str:
+    """Apply fixed ANSI style to assistant output text."""
+    return apply_ansi(text, ASSISTANT_TEXT_COLOR)
 
 
 def format_user_text(text: str) -> str:
-    """Apply optional ANSI style to transcribed user text."""
-    if not supports_ansi():
-        return text
-
-    color = USER_COLOR_CODES.get(USER_TEXT_COLOR_NAME, "")
-    if USER_TEXT_BOLD_ENABLED:
-        color = f"\033[1m{color}"
-    if not color:
-        return text
-    return f"{color}{text}{ANSI_RESET}"
+    """Return user text unchanged."""
+    return text
 
 
 def format_user_label(text: str) -> str:
     """Apply fixed ANSI style to the user speaker label."""
-    if not supports_ansi():
-        return text
-    return f"\033[1m{USER_LABEL_COLOR}{text}{ANSI_RESET}"
+    return apply_ansi(text, ANSI_BOLD, USER_LABEL_COLOR)
 
 
 def format_assistant_label(text: str) -> str:
     """Apply fixed ANSI style to the assistant speaker label."""
-    if not supports_ansi():
-        return text
-    return f"\033[1m{ASSISTANT_LABEL_COLOR}{text}{ANSI_RESET}"
-
-
-def safe_session_dir_name(raw_name: str) -> str:
-    """Convert a session id/name to a filesystem-safe directory name."""
-    cleaned = re.sub(r"[^A-Za-z0-9_.-]", "_", raw_name)
-    return cleaned or "unknown-session"
-
-
-def record_wav_until_enter(path: Path, sample_rate: int, channels: int) -> None:
-    """Record microphone audio until Enter is pressed, then save a WAV file."""
-    chunks: list[np.ndarray] = []
-    stop_event = threading.Event()
-
-    def callback(
-        indata: np.ndarray,
-        _frames: int,
-        _time: object,
-        status: sd.CallbackFlags,
-    ) -> None:
-        if status:
-            stderr(f"{status}\n")
-        chunks.append(indata.copy())
-
-    def wait_for_enter() -> None:
-        with contextlib.suppress(EOFError):
-            input()
-        stop_event.set()
-
-    stderr("Recording... press Enter to stop this turn.\n")
-    input_thread = threading.Thread(target=wait_for_enter, daemon=True)
-    input_thread.start()
-
-    with sd.InputStream(
-        samplerate=sample_rate,
-        channels=channels,
-        dtype="float32",
-        callback=callback,
-    ):
-        while not stop_event.is_set():
-            sd.sleep(100)
-
-    if not chunks:
-        msg = "No audio captured from microphone"
-        raise RuntimeError(msg)
-
-    audio = np.concatenate(chunks, axis=0)
-    audio_int16 = np.clip(audio, -1, 1)
-    audio_int16 = (audio_int16 * 32767).astype(np.int16)
-    wav_write(path, sample_rate, audio_int16)
+    return apply_ansi(text, ANSI_BOLD, ASSISTANT_LABEL_COLOR)
 
 
 def load_session_id(state_path: Path) -> str | None:
@@ -496,53 +309,19 @@ def ask_opencode(
     return response_text, discovered_session or session_id
 
 
-def capture_turn(
-    args: argparse.Namespace,
-    input_audio_session: str,
-) -> tuple[str, str | None]:
-    """Record one microphone turn and transcribe it with Whisper."""
-    if args.keep_input_audio:
-        session_dir = KEPT_INPUT_AUDIO_DIR / safe_session_dir_name(input_audio_session)
-        session_dir.mkdir(parents=True, exist_ok=True)
-        timestamp = datetime.now(tz=UTC).strftime("%Y-%m-%d-%H-%M-%S")
-        fd, temp_name = tempfile.mkstemp(
-            prefix=f"{timestamp}-",
-            suffix=".wav",
-            dir=session_dir,
-        )
-        os.close(fd)
-        wav_path = Path(temp_name)
-        record_wav_until_enter(
-            wav_path,
-            sample_rate=args.input_sample_rate,
-            channels=args.input_channels,
-        )
-        stderr("Transcribing...\n")
-        text, detected_language = whisper_to_text(wav_path=wav_path, args=args)
-        stderr(f"Saved recording: {wav_path}\n")
-        return text.strip(), detected_language
-
-    with tempfile.NamedTemporaryFile(suffix=".wav", delete=True) as tmp:
-        wav_path = Path(tmp.name)
-        record_wav_until_enter(
-            wav_path,
-            sample_rate=args.input_sample_rate,
-            channels=args.input_channels,
-        )
-        stderr("Transcribing...\n")
-        text, detected_language = whisper_to_text(wav_path=wav_path, args=args)
-    return text.strip(), detected_language
-
-
 # pylint: disable=too-many-branches,too-many-statements
 def run_voice_chat(args: argparse.Namespace) -> None:  # noqa: C901, PLR0912, PLR0915
     """Run the continuous record/transcribe/ask/reply loop."""
     state_path = args.session_file.expanduser().resolve()
     session_id = resolve_session_id(args, state_path)
-    speaker: KokoroSpeaker | None = None
-    tts_enabled = args.voice
+    try:
+        whisper_model = build_whisper_model(args)
+    except Exception as exc:  # pylint: disable=broad-exception-caught
+        stderr(f"Failed to load Whisper model: {exc}\n")
+        raise SystemExit(2) from exc
 
-    if tts_enabled:
+    speaker: KokoroSpeaker | None = None
+    if args.voice:
         try:
             speaker = KokoroSpeaker(
                 lang_code=args.tts_lang_code,
@@ -574,7 +353,12 @@ def run_voice_chat(args: argparse.Namespace) -> None:  # noqa: C901, PLR0912, PL
     while True:
         try:
             current_session = session_id or "new-session"
-            user_text, detected_language = capture_turn(args, current_session)
+            user_text, detected_language = capture_turn(
+                args,
+                current_session,
+                whisper_model,
+                stderr,
+            )
         except RuntimeError as exc:
             stderr(f"{exc}\n")
             stderr("Please try again.\n")

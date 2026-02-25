@@ -38,7 +38,7 @@ repos:
 
       - id: ty-typecheck
         name: type check with ty
-        entry: uv run --group lint ty check voice_chat.py
+        entry: uv run --group lint ty check vincent
         language: system
         pass_filenames: false
 
@@ -50,7 +50,7 @@ repos:
 
       - id: vulture
         name: check dead code with vulture
-        entry: uv run --group lint vulture voice_chat.py
+        entry: uv run --group lint vulture vincent tests
         args: [--min-confidence, "70"]
         language: system
         pass_filenames: false

@@ -14,9 +14,9 @@ dependencies = [
 ]
 
 [project.scripts]
-vincent = "voice_chat:main"
-kokoro-info = "kokoro_info:main"
-voice-chat = "voice_chat:main"
+vincent = "vincent.cli:main"
+kokoro-info = "vincent.kokoro_info:main"
+voice-chat = "vincent.cli:main"
 
 [dependency-groups]
 dev = [
@@ -47,7 +47,7 @@ build-backend = "hatchling.build"
 allow-direct-references = true
 
 [tool.hatch.build.targets.wheel]
-only-include = ["voice_chat.py", "kokoro_info.py"]
+packages = ["vincent"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
@@ -105,7 +105,7 @@ ignore = [
 ]
 
 [tool.ruff.lint.per-file-ignores]
-"kokoro_info.py" = [
+"vincent/kokoro_info.py" = [
   "TC003", # Allow runtime imports used in overload signatures.
 ]
 "tests/**/*.py" = [
@@ -131,12 +131,15 @@ ignore-imports = true
 [tool.mypy]
 python_version = "3.13"
 strict = true
-files = ["voice_chat.py"]
+files = ["vincent"]
 
 [[tool.mypy.overrides]]
 module = [
   "faster_whisper",
   "kokoro",
+  "kokoro.*",
+  "kokoro.pipeline",
+  "huggingface_hub",
   "scipy",
   "scipy.io.wavfile",
   "sounddevice",

@@ -24,7 +24,8 @@ Practical guidance for humans and coding agents working in this repository.
 
 ## Repo Layout
 
-- `voice_chat.py`: main CLI entrypoint.
+- `vincent/cli.py`: main CLI entrypoint.
+- `vincent/`: core package modules.
 - `README.md`: usage and setup notes.
 - `pyproject.toml`: metadata and tooling configuration.
 - `.python-version`: pinned local Python version.
@@ -34,8 +35,8 @@ Practical guidance for humans and coding agents working in this repository.
 Prefer repo-local, reproducible commands:
 
 - Sync dependencies: `uv sync`.
-- Run app: `uv run voice-chat` (or `uv run python voice_chat.py`).
-- Run app with assistant speech output: `uv run voice-chat --voice`.
+- Run app: `uv run vincent` (or `uv run python -m vincent.cli`).
+- Run app with assistant speech output: `uv run vincent --voice`.
 - Run tests: `uv run pytest`.
 - Run linter: `uv run ruff check .`.
 - Run Semgrep scan: `uv run --group lint semgrep --config=auto --error .`.
@@ -43,7 +44,7 @@ Prefer repo-local, reproducible commands:
 - Run type checks: `uv run mypy`.
 - Install hooks: `uv run pre-commit install`.
 - Run hooks manually: `uv run pre-commit run --all-files`.
-- Optional extended lint checks: `uv run --group lint pylint voice_chat.py`.
+- Optional extended lint checks: `uv run --group lint pylint vincent`.
 - Optional personal lint sweep: `source .venv/bin/activate && l3`.
 - Optional personal autofix pass: `source .venv/bin/activate && rf`.
 
