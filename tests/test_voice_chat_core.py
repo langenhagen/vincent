@@ -114,3 +114,17 @@ def test_parse_args_rejects_old_model_flag(monkeypatch: pytest.MonkeyPatch) -> N
 
     msg = "Expected parse_args to exit for removed --model flag"
     raise AssertionError(msg)
+
+
+def test_parse_args_voice_defaults_on_and_can_disable(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Enable voice by default and allow explicit disable via --no-voice."""
+    monkeypatch.setattr(sys, "argv", ["vincent"])
+    default_args = voice_chat.parse_args()
+
+    monkeypatch.setattr(sys, "argv", ["vincent", "--no-voice"])
+    disabled_args = voice_chat.parse_args()
+
+    assert default_args.voice
+    assert not disabled_args.voice

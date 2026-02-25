@@ -32,8 +32,8 @@ export HF_TOKEN=hf_your_token_here
 ## Usage
 
 ```bash
-uv run vincent  # Text output only
-uv run vincent --voice  # Enable assistant speech output
+uv run vincent
+uv run vincent --no-voice  # Disable assistant speech output
 
 # Useful options
 uv run vincent --help
@@ -44,7 +44,7 @@ uv run vincent --whisper-model small
 uv run vincent --input-language en
 uv run vincent --input-sample-rate 16000 --input-channels 1
 uv run vincent --keep-input-audio
-uv run vincent --voice --tts-voice af_heart --tts-lang-code a --tts-speed 1.0
+uv run vincent --tts-voice af_heart --tts-lang-code a --tts-speed 1.0
 
 # Look up Kokoro Language Codes, Voices and Whatnot
 uv run vincent-kokoro-info --lang-codes

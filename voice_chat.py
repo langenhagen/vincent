@@ -242,8 +242,9 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--voice",
-        action="store_true",
-        help="Speak assistant replies with Kokoro text-to-speech",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="Speak assistant replies with Kokoro text-to-speech (enabled by default)",
     )
     parser.add_argument(
         "--tts-voice",
