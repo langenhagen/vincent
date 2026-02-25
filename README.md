@@ -49,9 +49,9 @@ uv run vincent --keep-input-audio
 uv run vincent --tts-voice af_heart --tts-lang-code a --tts-speed 1.0
 
 # Look up Kokoro Language Codes, Voices and Whatnot
-uv run vincent-kokoro-info --lang-codes
-uv run vincent-kokoro-info --aliases
-uv run vincent-kokoro-info --voices
+uv run kokoro-info --lang-codes
+uv run kokoro-info --aliases
+uv run kokoro-info --voices
 ```
 
 Say `exit` or `quit` to stop.

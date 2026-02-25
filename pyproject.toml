@@ -15,7 +15,7 @@ dependencies = [
 
 [project.scripts]
 vincent = "voice_chat:main"
-vincent-kokoro-info = "kokoro_info:main"
+kokoro-info = "kokoro_info:main"
 voice-chat = "voice_chat:main"
 
 [dependency-groups]
