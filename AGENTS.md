@@ -78,6 +78,11 @@ Interpret these tokens as explicit workflow commands:
   - Follow commit message rules below.
   - Include both the commit message and a short prose walkthrough.
 
+- `bigcheck` or `big check`
+  - Run and act on this full local sweep:
+    - `source .venv/bin/activate; rf; l3; pre-commit run --all; pytest`
+  - Treat failures as actionable, fix them, and re-run until green when feasible.
+
 ## Commit Workflow Expectations
 
 When asked to commit:
