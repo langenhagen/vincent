@@ -1,0 +1,12 @@
+[project]
+name = "vincent-voice-chat"
+version = "0.1.0"
+description = "Microphone voice chat bridge with Whisper, opencode, and optional TTS"
+readme = "README.md"
+requires-python = ">=3.13.3"
+dependencies = [
+    "faster-whisper>=1.2.1",
+    "kokoro>=0.9.4",
+    "scipy>=1.17.0",
+    "sounddevice>=0.5.5",
+]
