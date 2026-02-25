@@ -11,6 +11,7 @@ import subprocess
 import sys
 import tempfile
 import threading
+import warnings
 from pathlib import Path
 
 import numpy as np
@@ -35,6 +36,18 @@ USER_COLOR_CODES = {
     "green": "\033[32m",
     "yellow": "\033[33m",
 }
+SYSTEM_COLOR_CODES = {
+    "none": "",
+    "blue": "\033[34m",
+    "white": "\033[37m",
+    "bright-black": "\033[90m",
+    "green": "\033[32m",
+    "yellow": "\033[33m",
+}
+SYSTEM_COLOR_NAME = "none"
+SYSTEM_BOLD_ENABLED = False
+USER_LABEL_COLOR = "\033[34m"
+ASSISTANT_LABEL_COLOR = "\033[32m"
 
 
 def whisper_to_text(
@@ -69,6 +82,20 @@ class KokoroSpeaker:
         speed: float,
     ) -> None:
         """Initialize Kokoro pipeline and playback parameters."""
+        warnings.filterwarnings(
+            "ignore",
+            message=("dropout option adds dropout after all but last recurrent layer"),
+            category=UserWarning,
+        )
+        warnings.filterwarnings(
+            "ignore",
+            message=(
+                "`torch.nn.utils.weight_norm` is deprecated in favor of "
+                "`torch.nn.utils.parametrizations.weight_norm`"
+            ),
+            category=FutureWarning,
+        )
+
         try:
             kokoro_module = importlib.import_module("kokoro")
         except Exception as exc:  # pylint: disable=broad-exception-caught
@@ -84,7 +111,10 @@ class KokoroSpeaker:
             raise RuntimeError(msg)
 
         try:
-            self._pipeline = kpipeline(lang_code=lang_code)
+            self._pipeline = kpipeline(
+                lang_code=lang_code,
+                repo_id="hexgrad/Kokoro-82M",
+            )
         except Exception as exc:  # pylint: disable=broad-exception-caught
             msg = (
                 "Kokoro failed to initialize. This is often a Python-version "
@@ -209,13 +239,24 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--user-color",
         choices=sorted(USER_COLOR_CODES.keys()),
-        default="bright-black",
+        default="none",
         help="Slight terminal color tint for transcribed user turns",
     )
     parser.add_argument(
         "--user-bold",
         action="store_true",
         help="Render transcribed user turns in bold where supported",
+    )
+    parser.add_argument(
+        "--system-color",
+        choices=sorted(SYSTEM_COLOR_CODES.keys()),
+        default="bright-black",
+        help="Slight terminal color tint for status and system text",
+    )
+    parser.add_argument(
+        "--system-bold",
+        action="store_true",
+        help="Render status and system text in bold where supported",
     )
     parser.add_argument(
         "--voice",
@@ -249,6 +290,12 @@ def stdout(message: str) -> None:
 
 def stderr(message: str) -> None:
     """Write a message to standard error and flush immediately."""
+    if supports_ansi():
+        color = SYSTEM_COLOR_CODES.get(SYSTEM_COLOR_NAME, "")
+        if SYSTEM_BOLD_ENABLED:
+            color = f"\033[1m{color}"
+        if color:
+            message = f"{color}{message}{ANSI_RESET}"
     sys.stderr.write(message)
     sys.stderr.flush()
 
@@ -286,6 +333,20 @@ def format_user_text(text: str, args: argparse.Namespace) -> str:
     return f"{color}{text}{ANSI_RESET}"
 
 
+def format_user_label(text: str) -> str:
+    """Apply fixed ANSI style to the user speaker label."""
+    if not supports_ansi():
+        return text
+    return f"\033[1m{USER_LABEL_COLOR}{text}{ANSI_RESET}"
+
+
+def format_assistant_label(text: str) -> str:
+    """Apply fixed ANSI style to the assistant speaker label."""
+    if not supports_ansi():
+        return text
+    return f"\033[1m{ASSISTANT_LABEL_COLOR}{text}{ANSI_RESET}"
+
+
 def record_wav_until_enter(path: Path, sample_rate: int, channels: int) -> None:
     """Record microphone audio until Enter is pressed, then save a WAV file."""
     chunks: list[np.ndarray] = []
@@ -306,7 +367,7 @@ def record_wav_until_enter(path: Path, sample_rate: int, channels: int) -> None:
             input()
         stop_event.set()
 
-    stdout("Recording... press Enter to stop this turn.\n")
+    stderr("Recording... press Enter to stop this turn.")
     input_thread = threading.Thread(target=wait_for_enter, daemon=True)
     input_thread.start()
 
@@ -496,7 +557,7 @@ def run_voice_chat(args: argparse.Namespace) -> None:
             stderr("Please try again.\n")
             continue
         except KeyboardInterrupt:
-            stderr("\nStopped.\n")
+            stderr("Stopped.\n")
             return
 
         if not user_text:
@@ -504,7 +565,8 @@ def run_voice_chat(args: argparse.Namespace) -> None:
             continue
 
         styled_user = format_user_text(user_text, args)
-        stdout(f"You: {styled_user}\n")
+        styled_user_label = format_user_label("You:")
+        stdout(f"{styled_user_label}\n{styled_user}\n\n")
         if detected_language:
             stderr(f"Detected language: {detected_language}\n")
 
@@ -523,7 +585,7 @@ def run_voice_chat(args: argparse.Namespace) -> None:
             stderr(f"{exc}\n")
             continue
         except KeyboardInterrupt:
-            stderr("\nStopped.\n")
+            stderr("Stopped.\n")
             return
 
         if discovered_session_id and discovered_session_id != session_id:
@@ -536,7 +598,8 @@ def run_voice_chat(args: argparse.Namespace) -> None:
             continue
 
         styled = format_assistant_text(assistant_text, args)
-        stdout(f"Assistant: {styled}\n\n")
+        styled_assistant_label = format_assistant_label("Assistant:")
+        stdout(f"{styled_assistant_label}\n{styled}\n\n")
         if speaker:
             try:
                 speaker.speak(assistant_text)
@@ -546,7 +609,12 @@ def run_voice_chat(args: argparse.Namespace) -> None:
 
 def main() -> None:
     """Entry point for voice chat."""
+    global SYSTEM_BOLD_ENABLED
+    global SYSTEM_COLOR_NAME
+
     args = parse_args()
+    SYSTEM_COLOR_NAME = args.system_color
+    SYSTEM_BOLD_ENABLED = args.system_bold
     run_voice_chat(args)
 
 
