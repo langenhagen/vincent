@@ -1,0 +1,74 @@
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: check-ast
+      - id: check-executables-have-shebangs
+      - id: check-merge-conflict
+      - id: check-shebang-scripts-are-executable
+      - id: check-toml
+      - id: check-yaml
+      - id: end-of-file-fixer
+      - id: trailing-whitespace
+        exclude: ^README\.md$
+
+  - repo: https://github.com/codespell-project/codespell
+    rev: v2.4.1
+    hooks:
+      - id: codespell
+        args: [-L, astroid]
+
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.15.1
+    hooks:
+      - id: ruff-check
+        args: [--fix, --ignore, FIX002]
+      - id: ruff-format
+      - id: ruff-check
+        name: ruff-import-sorting
+        args: [--select, I, --fix]
+
+  - repo: local
+    hooks:
+      - id: ty-typecheck
+        name: type check with ty
+        entry: uv run --group lint ty check voice_chat.py
+        language: system
+        pass_filenames: false
+
+      - id: mypy-typecheck
+        name: type check with mypy
+        entry: uv run mypy
+        language: system
+        pass_filenames: false
+
+      - id: vulture
+        name: check dead code with vulture
+        entry: uv run --group lint vulture voice_chat.py
+        args: [--min-confidence, "70"]
+        language: system
+        pass_filenames: false
+
+      - id: taplo-check
+        name: taplo check
+        entry: taplo check
+        language: system
+        files: \.toml$
+
+      - id: taplo-fmt
+        name: taplo fmt
+        entry: taplo fmt
+        language: system
+        files: \.toml$
+
+      - id: shellcheck
+        name: shellcheck
+        entry: shellcheck -x --exclude SC2059
+        language: system
+        files: \.sh$
+
+      - id: shfmt
+        name: shfmt
+        entry: shfmt --indent 4 --write
+        language: system
+        files: \.sh$

@@ -9,26 +9,28 @@ Single-purpose voice chat CLI:
 ## Setup
 
 ```bash
+uv venv --python 3.13 --seed
 uv sync
 ```
 
 Use Python 3.13 for best Kokoro compatibility.
 
+Why `--seed`? It installs base tooling like `pip` into `.venv`. This avoids
+`No module named pip` errors that can appear during Kokoro initialization.
+
 ## Usage
 
 ```bash
-# Text only
-uv run python voice_chat.py
-
-# Enable assistant speech output
-uv run python voice_chat.py --voice
+uv run vincent  # Text output only
+uv run vincent --voice  # Enable assistant speech output
 
 # Useful options
-uv run python voice_chat.py --new-session
-uv run python voice_chat.py --session-id ses_abc123
-uv run python voice_chat.py --task translate
-uv run python voice_chat.py --model small
-uv run python voice_chat.py --voice --tts-voice af_heart --tts-lang-code a --tts-speed 1.0
+uv run vincent --help
+uv run vincent --new-session
+uv run vincent --session-id ses_abc123
+uv run vincent --task translate
+uv run vincent --model small
+uv run vincent --voice --tts-voice af_heart --tts-lang-code a --tts-speed 1.0
 ```
 
 Say `exit` or `quit` to stop.

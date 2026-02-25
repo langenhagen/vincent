@@ -1,9 +1,9 @@
-#!/usr/bin/env python3
 """Voice chat bridge: microphone Whisper transcription + opencode session."""
 
 # pylint: disable=import-error
 
 import argparse
+import contextlib
 import importlib
 import json
 import os
@@ -68,6 +68,7 @@ class KokoroSpeaker:
         voice: str,
         speed: float,
     ) -> None:
+        """Initialize Kokoro pipeline and playback parameters."""
         try:
             kokoro_module = importlib.import_module("kokoro")
         except Exception as exc:  # pylint: disable=broad-exception-caught
@@ -301,10 +302,8 @@ def record_wav_until_enter(path: Path, sample_rate: int, channels: int) -> None:
         chunks.append(indata.copy())
 
     def wait_for_enter() -> None:
-        try:
+        with contextlib.suppress(EOFError):
             input()
-        except EOFError:
-            pass
         stop_event.set()
 
     stdout("Recording... press Enter to stop this turn.\n")
@@ -358,7 +357,7 @@ def resolve_session_id(args: argparse.Namespace, state_path: Path) -> str | None
     """Pick the initial session id from CLI args and stored state."""
     if args.session_id:
         save_session_id(state_path, args.session_id)
-        return args.session_id
+        return str(args.session_id)
     if args.new_session:
         return None
     return load_session_id(state_path)
