@@ -15,6 +15,7 @@ import os
 import subprocess  # nosec B404  # B404: required for opencode CLI subprocess call.
 import sys
 from pathlib import Path
+from typing import TextIO
 
 import sounddevice as sd
 
@@ -30,9 +31,19 @@ ASSISTANT_LABEL_COLOR = "\033[32m"
 ASSISTANT_TEXT_COLOR = "\033[36m"
 
 
+def positive_int(value: str) -> int:
+    """Parse an integer CLI value and ensure it is positive."""
+    parsed = int(value)
+    if parsed <= 0:
+        msg = f"Expected a positive integer, got {value}"
+        raise argparse.ArgumentTypeError(msg)
+    return parsed
+
+
 def parse_args() -> argparse.Namespace:
     """Parse command-line flags for microphone-to-opencode voice chat."""
     parser = argparse.ArgumentParser(
+        allow_abbrev=False,
         description=(
             "Record microphone audio, transcribe with Whisper, and send turns "
             "to a long-lived opencode session."
@@ -67,13 +78,13 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--input-sample-rate",
-        type=int,
+        type=positive_int,
         default=16000,
         help="Microphone input sample rate in Hz",
     )
     parser.add_argument(
         "--input-channels",
-        type=int,
+        type=positive_int,
         default=1,
         help="Microphone input channel count (1=mono, 2=stereo)",
     )
@@ -154,17 +165,18 @@ def stdout(message: str) -> None:
 
 def stderr(message: str) -> None:
     """Write a message to standard error and flush immediately."""
-    if supports_ansi():
+    if supports_ansi(sys.stderr):
         message = f"{SYSTEM_TEXT_COLOR}{message}{ANSI_RESET}"
     sys.stderr.write(message)
     sys.stderr.flush()
 
 
-def supports_ansi() -> bool:
+def supports_ansi(stream: TextIO | None = None) -> bool:
     """Return True when terminal color output should be enabled."""
     if os.getenv("NO_COLOR") is not None:
         return False
-    return sys.stdout.isatty()
+    output_stream = stream or sys.stdout
+    return output_stream.isatty()
 
 
 def apply_ansi(text: str, *styles: str) -> str:
@@ -225,7 +237,13 @@ def save_session_id(state_path: Path, session_id: str) -> None:
 def resolve_session_id(args: argparse.Namespace, state_path: Path) -> str | None:
     """Pick the initial session id from CLI args and stored state."""
     if args.session_id:
-        save_session_id(state_path, args.session_id)
+        try:
+            save_session_id(state_path, args.session_id)
+        except OSError as exc:
+            stderr(
+                f"Could not persist session id to {state_path}: {exc}. "
+                "Continuing with in-memory session only.\n",
+            )
         return str(args.session_id)
     if args.new_session:
         return None
@@ -293,13 +311,21 @@ def ask_opencode(
 ) -> tuple[str, str | None]:
     """Send one prompt to opencode and return the response and session id."""
     command = build_opencode_command(prompt, args, session_id)
-    # Fixed argv list; shell execution is explicitly disabled.
-    result = subprocess.run(  # noqa: S603  # nosec B603
-        command,
-        check=False,
-        capture_output=True,
-        text=True,
-    )
+    try:
+        # Fixed argv list; shell execution is explicitly disabled.
+        result = subprocess.run(  # noqa: S603  # nosec B603
+            command,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+    except FileNotFoundError as exc:
+        msg = "`opencode` executable was not found in PATH"
+        raise RuntimeError(msg) from exc
+    except OSError as exc:
+        msg = f"Failed to launch `opencode`: {exc}"
+        raise RuntimeError(msg) from exc
+
     if result.returncode != 0:
         details = result.stderr.strip() or result.stdout.strip()
         msg = f"opencode run failed ({result.returncode}): {details}"
@@ -397,8 +423,13 @@ def run_voice_chat(args: argparse.Namespace) -> None:  # noqa: C901, PLR0912, PL
 
         if discovered_session_id and discovered_session_id != session_id:
             session_id = discovered_session_id
-            save_session_id(state_path, session_id)
-            stderr(f"Saved opencode session: {session_id} ({state_path})\n")
+            try:
+                save_session_id(state_path, session_id)
+                stderr(f"Saved opencode session: {session_id} ({state_path})\n")
+            except OSError as exc:
+                stderr(
+                    f"Could not persist discovered session id to {state_path}: {exc}\n",
+                )
 
         if not assistant_text:
             stderr("opencode returned no text response.\n")

@@ -6,6 +6,7 @@ recorded WAV files into recognized text.
 
 from __future__ import annotations
 
+import contextlib
 from typing import TYPE_CHECKING
 
 from faster_whisper import WhisperModel
@@ -56,18 +57,25 @@ def capture_turn(
         keep_input_audio=args.keep_input_audio,
         input_audio_session=input_audio_session,
     ) as wav_path:
-        record_wav_until_enter(
-            wav_path,
-            sample_rate=args.input_sample_rate,
-            channels=args.input_channels,
-            status_writer=status_writer,
-        )
-        status_writer("Transcribing...\n")
-        text, detected_language = whisper_to_text(
-            wav_path=wav_path,
-            args=args,
-            whisper_model=whisper_model,
-        )
+        try:
+            record_wav_until_enter(
+                wav_path,
+                sample_rate=args.input_sample_rate,
+                channels=args.input_channels,
+                status_writer=status_writer,
+            )
+            status_writer("Transcribing...\n")
+            text, detected_language = whisper_to_text(
+                wav_path=wav_path,
+                args=args,
+                whisper_model=whisper_model,
+            )
+        except Exception:
+            if args.keep_input_audio:
+                with contextlib.suppress(OSError):
+                    wav_path.unlink()
+            raise
+
         if args.keep_input_audio:
             status_writer(f"Saved recording: {wav_path}\n")
 
