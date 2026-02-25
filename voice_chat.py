@@ -7,11 +7,13 @@ import contextlib
 import importlib
 import json
 import os
+import re
 import subprocess  # nosec B404  # B404: required for opencode CLI subprocess call.
 import sys
 import tempfile
 import threading
 import warnings
+from datetime import datetime
 from pathlib import Path
 
 import numpy as np
@@ -20,6 +22,7 @@ from faster_whisper import WhisperModel
 from scipy.io.wavfile import write as wav_write
 
 EXIT_PHRASES = {"exit", "quit", "goodbye"}
+KEPT_INPUT_AUDIO_DIR = Path(".voice_inputs")
 ANSI_RESET = "\033[0m"
 ASSISTANT_COLOR_CODES = {
     "none": "",
@@ -199,7 +202,10 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--keep-input-audio",
         action="store_true",
-        help="Keep each recorded input WAV file and print its path",
+        help=(
+            "Keep each recorded input WAV in .voice_inputs/<session>/ with a "
+            "YYYY-MM-DD-HH-MM-SS filename prefix"
+        ),
     )
 
     session_group = parser.add_mutually_exclusive_group()
@@ -486,10 +492,35 @@ def ask_opencode(
 
 def capture_turn(args: argparse.Namespace) -> tuple[str, str | None]:
     """Record one microphone turn and transcribe it with Whisper."""
-    with tempfile.NamedTemporaryFile(
-        suffix=".wav",
-        delete=not args.keep_input_audio,
-    ) as tmp:
+
+    def safe_session_dir_name(raw_name: str) -> str:
+        """Convert session name to a filesystem-safe directory name."""
+        cleaned = re.sub(r"[^A-Za-z0-9_.-]", "_", raw_name)
+        return cleaned or "unknown-session"
+
+    if args.keep_input_audio:
+        session_name = getattr(args, "_input_audio_session", "new-session")
+        session_dir = KEPT_INPUT_AUDIO_DIR / safe_session_dir_name(session_name)
+        session_dir.mkdir(parents=True, exist_ok=True)
+        timestamp = datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
+        fd, temp_name = tempfile.mkstemp(
+            prefix=f"{timestamp}-",
+            suffix=".wav",
+            dir=session_dir,
+        )
+        os.close(fd)
+        wav_path = Path(temp_name)
+        record_wav_until_enter(
+            wav_path,
+            sample_rate=args.input_sample_rate,
+            channels=args.input_channels,
+        )
+        stderr("Transcribing...\n")
+        text, detected_language = whisper_to_text(wav_path=wav_path, args=args)
+        stderr(f"Saved recording: {wav_path}\n")
+        return text.strip(), detected_language
+
+    with tempfile.NamedTemporaryFile(suffix=".wav", delete=True) as tmp:
         wav_path = Path(tmp.name)
         record_wav_until_enter(
             wav_path,
@@ -498,8 +529,6 @@ def capture_turn(args: argparse.Namespace) -> tuple[str, str | None]:
         )
         stderr("Transcribing...\n")
         text, detected_language = whisper_to_text(wav_path=wav_path, args=args)
-        if args.keep_input_audio:
-            stderr(f"Saved recording: {wav_path}\n")
     return text.strip(), detected_language
 
 
@@ -542,6 +571,7 @@ def run_voice_chat(args: argparse.Namespace) -> None:  # noqa: C901, PLR0912, PL
 
     while True:
         try:
+            args._input_audio_session = session_id or "new-session"
             user_text, detected_language = capture_turn(args)
         except RuntimeError as exc:
             stderr(f"{exc}\n")

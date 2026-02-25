@@ -59,4 +59,4 @@ Say `exit` or `quit` to stop.
 - `--input-language`: hint the spoken language for Whisper (faster and often more accurate); omit to auto-detect.
 - `--input-sample-rate`: microphone capture rate in Hz (default `16000`, good for speech).
 - `--input-channels`: microphone channel count (`1` mono is typical; `2` stereo if needed).
-- `--keep-input-audio`: keep each turn's temporary WAV on disk for debugging.
+- `--keep-input-audio`: keep each turn's WAV in `.voice_inputs/<session>/`.
