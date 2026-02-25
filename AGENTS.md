@@ -9,6 +9,7 @@ Practical guidance for humans and coding agents working in this repository.
 - Assume files may change while you work; re-read before final writes and commits.
 - Search the web proactively when debugging, investigating, or verifying API behavior.
 - Add clear names and comments where structure is non-obvious.
+- Prefer smaller, modular files over monolithic files when adding or refactoring code.
 - Avoid over-engineering: prefer the simplest solution that is clear, maintainable, and testable.
 - Capitalize Markdown headlines (prefer Title Case).
 
