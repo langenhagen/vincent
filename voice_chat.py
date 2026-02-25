@@ -44,10 +44,14 @@ SYSTEM_COLOR_CODES = {
     "green": "\033[32m",
     "yellow": "\033[33m",
 }
-SYSTEM_COLOR_NAME = "none"
+SYSTEM_COLOR_NAME = "bright-black"
 SYSTEM_BOLD_ENABLED = False
 USER_LABEL_COLOR = "\033[34m"
 ASSISTANT_LABEL_COLOR = "\033[32m"
+USER_TEXT_COLOR_NAME = "none"
+USER_TEXT_BOLD_ENABLED = False
+ASSISTANT_TEXT_COLOR_NAME = "cyan"
+ASSISTANT_TEXT_BOLD_ENABLED = False
 
 
 def whisper_to_text(
@@ -56,13 +60,13 @@ def whisper_to_text(
 ) -> tuple[str, str | None]:
     """Run Whisper on a WAV file and return text plus detected language."""
     model = WhisperModel(
-        args.model,
-        device=args.device,
-        compute_type=args.compute_type,
+        args.whisper_model,
+        device=args.whisper_device,
+        compute_type=args.whisper_compute_type,
     )
     segments, info = model.transcribe(
         str(wav_path),
-        task=args.task,
+        task=args.whisper_task,
         language=args.language,
         vad_filter=True,
     )
@@ -157,19 +161,23 @@ def parse_args() -> argparse.Namespace:
         ),
     )
 
-    parser.add_argument("--model", default="base", help="Whisper model name/path")
     parser.add_argument(
-        "--device",
+        "--whisper-model",
+        default="base",
+        help="Whisper model name/path",
+    )
+    parser.add_argument(
+        "--whisper-device",
         default="auto",
         help="Whisper device: auto, cpu, cuda",
     )
     parser.add_argument(
-        "--compute-type",
+        "--whisper-compute-type",
         default="int8",
         help="faster-whisper compute type (int8, float16, float32, ...)",
     )
     parser.add_argument(
-        "--task",
+        "--whisper-task",
         default="transcribe",
         choices=["transcribe", "translate"],
         help="Whisper task: transcribe original language or translate to English",
@@ -226,39 +234,6 @@ def parse_args() -> argparse.Namespace:
         help="Optional working directory for opencode run",
     )
     parser.add_argument(
-        "--assistant-color",
-        choices=sorted(ASSISTANT_COLOR_CODES.keys()),
-        default="cyan",
-        help="Slight terminal color tint for assistant replies",
-    )
-    parser.add_argument(
-        "--assistant-bold",
-        action="store_true",
-        help="Render assistant replies in bold where supported",
-    )
-    parser.add_argument(
-        "--user-color",
-        choices=sorted(USER_COLOR_CODES.keys()),
-        default="none",
-        help="Slight terminal color tint for transcribed user turns",
-    )
-    parser.add_argument(
-        "--user-bold",
-        action="store_true",
-        help="Render transcribed user turns in bold where supported",
-    )
-    parser.add_argument(
-        "--system-color",
-        choices=sorted(SYSTEM_COLOR_CODES.keys()),
-        default="bright-black",
-        help="Slight terminal color tint for status and system text",
-    )
-    parser.add_argument(
-        "--system-bold",
-        action="store_true",
-        help="Render status and system text in bold where supported",
-    )
-    parser.add_argument(
         "--voice",
         action="store_true",
         help="Speak assistant replies with Kokoro text-to-speech",
@@ -307,26 +282,26 @@ def supports_ansi() -> bool:
     return sys.stdout.isatty()
 
 
-def format_assistant_text(text: str, args: argparse.Namespace) -> str:
+def format_assistant_text(text: str) -> str:
     """Apply optional ANSI style to assistant output text."""
     if not supports_ansi():
         return text
 
-    color = ASSISTANT_COLOR_CODES.get(args.assistant_color, "")
-    if args.assistant_bold:
+    color = ASSISTANT_COLOR_CODES.get(ASSISTANT_TEXT_COLOR_NAME, "")
+    if ASSISTANT_TEXT_BOLD_ENABLED:
         color = f"\033[1m{color}"
     if not color:
         return text
     return f"{color}{text}{ANSI_RESET}"
 
 
-def format_user_text(text: str, args: argparse.Namespace) -> str:
+def format_user_text(text: str) -> str:
     """Apply optional ANSI style to transcribed user text."""
     if not supports_ansi():
         return text
 
-    color = USER_COLOR_CODES.get(args.user_color, "")
-    if args.user_bold:
+    color = USER_COLOR_CODES.get(USER_TEXT_COLOR_NAME, "")
+    if USER_TEXT_BOLD_ENABLED:
         color = f"\033[1m{color}"
     if not color:
         return text
@@ -564,7 +539,7 @@ def run_voice_chat(args: argparse.Namespace) -> None:
             stderr("No speech detected.\n")
             continue
 
-        styled_user = format_user_text(user_text, args)
+        styled_user = format_user_text(user_text)
         styled_user_label = format_user_label("You:")
         stdout(f"{styled_user_label}\n{styled_user}\n\n")
         if detected_language:
@@ -597,7 +572,7 @@ def run_voice_chat(args: argparse.Namespace) -> None:
             stderr("opencode returned no text response.\n")
             continue
 
-        styled = format_assistant_text(assistant_text, args)
+        styled = format_assistant_text(assistant_text)
         styled_assistant_label = format_assistant_label("Assistant:")
         stdout(f"{styled_assistant_label}\n{styled}\n\n")
         if speaker:
@@ -609,12 +584,7 @@ def run_voice_chat(args: argparse.Namespace) -> None:
 
 def main() -> None:
     """Entry point for voice chat."""
-    global SYSTEM_BOLD_ENABLED
-    global SYSTEM_COLOR_NAME
-
     args = parse_args()
-    SYSTEM_COLOR_NAME = args.system_color
-    SYSTEM_BOLD_ENABLED = args.system_bold
     run_voice_chat(args)
 
 
