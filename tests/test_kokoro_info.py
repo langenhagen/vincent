@@ -5,7 +5,7 @@ from __future__ import annotations
 # pylint: disable=import-error  # E0401: some lint envs miss editable imports.
 from typing import TYPE_CHECKING
 
-import kokoro_info
+from vincent import kokoro_info
 
 if TYPE_CHECKING:
     import pytest
