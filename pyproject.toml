@@ -17,7 +17,12 @@ vincent-kokoro-info = "kokoro_info:main"
 voice-chat = "voice_chat:main"
 
 [dependency-groups]
-dev = ["mypy>=1.15.0", "pre-commit>=4.2.0", "pytest>=8.3.5", "ruff>=0.11.10"]
+dev = [
+  "mypy>=1.15.0",
+  "pre-commit>=4.2.0",
+  "pytest>=8.3.5",
+  "ruff>=0.11.10",
+]
 lint = [
   "bandit>=1.7.9",
   "black>=24.10.0",
@@ -85,6 +90,9 @@ ignore = [
 ]
 
 [tool.ruff.lint.per-file-ignores]
+"kokoro_info.py" = [
+  "TC003", # Allow runtime imports used in overload signatures.
+]
 "tests/**/*.py" = [
   "PT009", # Allow unittest-style assertions in test modules.
   "S101",  # Allow assert statements in test modules.

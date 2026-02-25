@@ -3,6 +3,42 @@
 from __future__ import annotations
 
 import argparse
+import importlib
+import sys
+from collections.abc import Callable
+from typing import Literal, overload
+
+
+def stdout(message: str) -> None:
+    """Write text to stdout without adding extra formatting."""
+    sys.stdout.write(message)
+
+
+@overload
+def load_module_attr(
+    module_name: Literal["huggingface_hub"],
+    attr_name: Literal["list_repo_files"],
+) -> Callable[..., list[str]]: ...
+
+
+@overload
+def load_module_attr(
+    module_name: Literal["kokoro.pipeline"],
+    attr_name: Literal["LANG_CODES"],
+) -> dict[str, str]: ...
+
+
+@overload
+def load_module_attr(
+    module_name: Literal["kokoro.pipeline"],
+    attr_name: Literal["ALIASES"],
+) -> dict[str, str]: ...
+
+
+def load_module_attr(module_name: str, attr_name: str) -> object:
+    """Load an attribute from a module by name at runtime."""
+    module = importlib.import_module(module_name)
+    return getattr(module, attr_name)
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
@@ -35,8 +71,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 
 def list_voices(repo_id: str) -> list[str]:
     """Return available voice ids from a Kokoro Hugging Face repository."""
-    from huggingface_hub import list_repo_files
-
+    list_repo_files = load_module_attr("huggingface_hub", "list_repo_files")
     files = list_repo_files(repo_id=repo_id, repo_type="model")
     voices = [
         path.removeprefix("voices/").removesuffix(".pt")
@@ -49,16 +84,12 @@ def list_voices(repo_id: str) -> list[str]:
 
 def list_lang_codes() -> dict[str, str]:
     """Return Kokoro language code mapping."""
-    from kokoro.pipeline import LANG_CODES
-
-    return dict(LANG_CODES)
+    return load_module_attr("kokoro.pipeline", "LANG_CODES").copy()
 
 
 def list_aliases() -> dict[str, str]:
     """Return Kokoro language alias mapping."""
-    from kokoro.pipeline import ALIASES
-
-    return dict(ALIASES)
+    return load_module_attr("kokoro.pipeline", "ALIASES").copy()
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -68,27 +99,23 @@ def main(argv: list[str] | None = None) -> int:
 
     if not show_any or args.lang_codes:
         lang_codes = list_lang_codes()
-        print("Language Codes:")
+        stdout("Language Codes:\n")
         for code, name in sorted(lang_codes.items()):
-            print(f"- {code}: {name}")
-        print()
+            stdout(f"- {code}: {name}\n")
+        stdout("\n")
 
     if not show_any or args.aliases:
         aliases = list_aliases()
-        print("Language Aliases:")
+        stdout("Language Aliases:\n")
         for alias, code in sorted(aliases.items()):
-            print(f"- {alias} -> {code}")
-        print()
+            stdout(f"- {alias} -> {code}\n")
+        stdout("\n")
 
     if not show_any or args.voices:
-        try:
-            voices = list_voices(args.repo_id)
-        except Exception as exc:  # pylint: disable=broad-exception-caught
-            print(f"Could not list voices from {args.repo_id}: {exc}")
-            return 1
-        print(f"Voices ({len(voices)}):")
+        voices = list_voices(args.repo_id)
+        stdout(f"Voices ({len(voices)}):\n")
         for voice in voices:
-            print(f"- {voice}")
+            stdout(f"- {voice}\n")
 
     return 0
 
