@@ -73,7 +73,6 @@ def test_main_without_flags_prints_all_sections(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     """Show every section when no explicit output flags are provided."""
-
     monkeypatch.setattr(
         kokoro_info,
         "list_lang_codes",
