@@ -46,6 +46,7 @@ Prefer repo-local, reproducible commands:
 - Install hooks: `uv run pre-commit install`.
 - Run hooks manually: `uv run pre-commit run --all-files`.
 - Optional extended lint checks: `uv run --group lint pylint vincent`.
+- Run dead-code scans liberally and act on findings: `uv run vulture planetfall/`.
 - Optional personal lint sweep: `source .venv/bin/activate && l3`.
 - Optional personal autofix pass: `source .venv/bin/activate && rf`.
 
