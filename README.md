@@ -31,6 +31,21 @@ get better download rate limits for Kokoro model assets.
 export HF_TOKEN=hf_your_token_here
 ```
 
+## Troubleshooting
+
+- `No module named pip`
+  - Recreate the venv with seeding: `uv venv --python 3.13 --seed && uv sync`
+  - Quick repair in existing env: `uv run python -m ensurepip --upgrade`
+
+- `Warning: You are sending unauthenticated requests to the HF Hub`
+  - Optional only. Set `HF_TOKEN` if you want better download limits:
+    `export HF_TOKEN=hf_your_token_here`
+
+- No audio output from Kokoro
+  - Check detected devices:
+    `uv run python -c "import sounddevice as sd; print(sd.default.device); print(sd.query_devices())"`
+  - Verify with text-only mode to isolate TTS/device issues: `uv run vincent --no-voice`
+
 ## Usage
 
 ```bash

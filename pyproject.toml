@@ -59,6 +59,12 @@ addopts = [
   "--cov-report=term",
 ]
 
+[tool.coverage.run]
+omit = ["_remote_module_non_scriptable", "*/_remote_module_non_scriptable"]
+
+[tool.coverage.report]
+omit = ["_remote_module_non_scriptable", "*/_remote_module_non_scriptable"]
+
 [tool.ruff]
 line-length = 88
 target-version = "py313"
