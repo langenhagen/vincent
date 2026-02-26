@@ -18,19 +18,6 @@ uv sync
 
 Use Python 3.13 for best Kokoro compatibility.
 
-Why `--seed`? It installs base tooling like `pip` into `.venv`. This avoids
-`No module named pip` errors that can appear during Kokoro initialization.
-
-Note: `uv sync` also installs `en-core-web-sm` (spaCy English model) because
-Kokoro's English voice pipeline depends on it.
-
-Optional: set `HF_TOKEN` to avoid Hugging Face anonymous-request warnings and
-get better download rate limits for Kokoro model assets.
-
-```bash
-export HF_TOKEN=hf_your_token_here
-```
-
 ## Troubleshooting
 
 - `No module named pip`
