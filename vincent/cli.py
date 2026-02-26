@@ -12,7 +12,6 @@ from __future__ import annotations
 import argparse
 import json
 import os
-import subprocess  # nosec B404  # B404: required for opencode CLI subprocess call.
 import sys
 from pathlib import Path
 from typing import TextIO
@@ -20,6 +19,7 @@ from typing import TextIO
 import sounddevice as sd
 
 from .kokoro_output import KokoroSpeaker
+from .opencode_client import OpenCodeRunOptions, ask_opencode
 from .whisper_input import build_whisper_model, capture_turn
 
 EXIT_PHRASES = {"exit", "quit", "goodbye"}
@@ -250,91 +250,6 @@ def resolve_session_id(args: argparse.Namespace, state_path: Path) -> str | None
     return load_session_id(state_path)
 
 
-def build_opencode_command(
-    message: str,
-    args: argparse.Namespace,
-    session_id: str | None,
-) -> list[str]:
-    """Build the opencode CLI command for one conversation turn."""
-    command = ["opencode", "run", "--format", "json"]
-    if session_id:
-        command.extend(["--session", session_id])
-    if args.opencode_model:
-        command.extend(["--model", args.opencode_model])
-    if args.opencode_agent:
-        command.extend(["--agent", args.opencode_agent])
-    if args.opencode_attach:
-        command.extend(["--attach", args.opencode_attach])
-    if args.opencode_dir:
-        command.extend(["--dir", args.opencode_dir])
-    command.append(message)
-    return command
-
-
-def parse_opencode_events(output: str) -> tuple[str, str | None]:
-    """Parse JSON event lines and return response text plus session id."""
-    response_chunks: list[str] = []
-    discovered_session: str | None = None
-
-    for raw_line in output.splitlines():
-        line = raw_line.strip()
-        if not line:
-            continue
-
-        try:
-            event = json.loads(line)
-        except json.JSONDecodeError:
-            continue
-
-        event_session_id = event.get("sessionID")
-        if isinstance(event_session_id, str) and event_session_id:
-            discovered_session = event_session_id
-
-        if event.get("type") != "text":
-            continue
-
-        part = event.get("part")
-        if not isinstance(part, dict):
-            continue
-
-        text = part.get("text")
-        if isinstance(text, str) and text:
-            response_chunks.append(text)
-
-    return "".join(response_chunks).strip(), discovered_session
-
-
-def ask_opencode(
-    prompt: str,
-    args: argparse.Namespace,
-    session_id: str | None,
-) -> tuple[str, str | None]:
-    """Send one prompt to opencode and return the response and session id."""
-    command = build_opencode_command(prompt, args, session_id)
-    try:
-        # Fixed argv list; shell execution is explicitly disabled.
-        result = subprocess.run(  # noqa: S603  # nosec B603
-            command,
-            check=False,
-            capture_output=True,
-            text=True,
-        )
-    except FileNotFoundError as exc:
-        msg = "`opencode` executable was not found in PATH"
-        raise RuntimeError(msg) from exc
-    except OSError as exc:
-        msg = f"Failed to launch `opencode`: {exc}"
-        raise RuntimeError(msg) from exc
-
-    if result.returncode != 0:
-        details = result.stderr.strip() or result.stdout.strip()
-        msg = f"opencode run failed ({result.returncode}): {details}"
-        raise RuntimeError(msg)
-
-    response_text, discovered_session = parse_opencode_events(result.stdout)
-    return response_text, discovered_session or session_id
-
-
 # pylint: disable=too-many-branches,too-many-statements
 def run_voice_chat(args: argparse.Namespace) -> None:  # noqa: C901, PLR0912, PLR0915
     """Run the continuous record/transcribe/ask/reply loop."""
@@ -409,10 +324,16 @@ def run_voice_chat(args: argparse.Namespace) -> None:  # noqa: C901, PLR0912, PL
 
         stderr("Asking opencode...\n")
         try:
+            opencode_options = OpenCodeRunOptions(
+                session_id=session_id,
+                model=args.opencode_model,
+                agent=args.opencode_agent,
+                attach=args.opencode_attach,
+                directory=args.opencode_dir,
+            )
             assistant_text, discovered_session_id = ask_opencode(
                 prompt=user_text,
-                args=args,
-                session_id=session_id,
+                options=opencode_options,
             )
         except RuntimeError as exc:
             stderr(f"{exc}\n")
