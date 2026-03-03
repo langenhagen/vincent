@@ -87,9 +87,14 @@ Interpret these tokens as explicit workflow commands:
   - Include both the commit message and a short prose walkthrough.
 
 - `bigcheck` or `big check`
-  - Run and act on this full local sweep:
-    - `source .venv/bin/activate; rf; l3; pre-commit run --all; pytest`
-  - Treat failures as actionable, fix them, and re-run until green when feasible.
+  - Per-file sweep only: finish file A (run `rf`, `l3`, fix, re-run until green,
+    then vulture and pytest as appropriate) before starting file B.
+  - Apply to all Python files in the repo, one after another.
+  - Run a repo-wide vulture sweep and pytest against all files at the end.
+  - Run pre-commit against all files at the end.
+  - Do not batch `l3` across multiple files or run it project-wide unless asked.
+  - Do not run `l3` in a for/while loop.
+
 
 ## Commit Workflow Expectations
 
