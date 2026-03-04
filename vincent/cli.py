@@ -140,8 +140,8 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--tts-voice",
-        default="af_heart",
-        help="Kokoro voice id, e.g. af_heart",
+        default="am_puck",
+        help="Kokoro voice id, e.g. am_puck",
     )
     parser.add_argument(
         "--tts-lang-code",
