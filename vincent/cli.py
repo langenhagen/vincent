@@ -357,7 +357,7 @@ def run_voice_chat(args: argparse.Namespace) -> None:  # noqa: C901, PLR0912, PL
             continue
 
         styled = format_assistant_text(assistant_text)
-        styled_assistant_label = format_assistant_label("Assistant:")
+        styled_assistant_label = format_assistant_label("Vincent:")
         stdout(f"{styled_assistant_label}\n{styled}\n\n")
         if speaker:
             try:

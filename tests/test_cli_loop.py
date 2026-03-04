@@ -86,7 +86,7 @@ def test_run_voice_chat_success_path_persists_session(
     cli.run_voice_chat(args)
 
     assert cli.load_session_id(args.session_file) == "ses_new"
-    assert any("Assistant:" in message for message in output_messages)
+    assert any("Vincent:" in message for message in output_messages)
     assert any("Hello back" in message for message in output_messages)
     assert any(
         "Saved opencode session: ses_new" in message for message in error_messages
